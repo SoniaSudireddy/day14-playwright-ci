@@ -1,0 +1,58 @@
+
+name: Day 14 Playwright CI
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  schedule:
+    - cron: '30 20 * * *'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Playwright Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests on PR
+        if: github.event_name == 'pull_request'
+        run: npx playwright test --grep @smoke --fail-on-flaky-tests
+
+      - name: Run full regression
+        if: github.event_name != 'pull_request'
+        run: npx playwright test --fail-on-flaky-tests
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-evidence
+          path: |
+            playwright-report/
+            test-results/
+            reports/
+          retention-days: 14
